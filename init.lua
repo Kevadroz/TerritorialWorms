@@ -60,12 +60,12 @@ local function genWormXML(worm)
 		name = spawned_worm_var_name
 	}))
 
-	if not settings.spawned_bleed then
+	if not settings.spawned_eat_ground then
 		for component in xml_worm:each_of("CellEaterComponent") do
 			component.attr._enabled = false
 		end
 	end
-	if not settings.spawned_eat_ground then
+	if not settings.spawned_bleed then
 		for component in xml_worm:each_of("DamageModelComponent") do
 			local attr = component.attr
 			if attr.blood_material == "blood_worm" then
@@ -114,7 +114,9 @@ local function setSetting(id, container, prefix)
 	local value = ModSettingGet(this_prefix .. id)
 	local value_type = type(value)
 	local setting_type = type(container[id])
-	if value_type == setting_type then
+	if value == nil and setting_type == "boolean" then
+		container[id] = false
+	elseif value_type == setting_type then
 		---@diagnostic disable-next-line: assign-type-mismatch
 		container[id] = value
 	else
@@ -343,7 +345,8 @@ local function doWormSpawnChance(entity_id, factor)
 			SetRandomSeed(GameGetFrameNum() + GetUpdatedComponentID(), Randomf(-65536, 65536) + y)
 			SetRandomSeed(GameGetFrameNum() + GetUpdatedComponentID(), Randomf(-65536, 65536) + entity_id)
 			frame_rand = frame_rand + Randomf(-65536, 65536)
-			if Randomf() < chance then
+			local spawn_chance = Randomf()
+			if spawn_chance < chance then
 				local direction = Randomf(0, math.pi * 2)
 				local vec_x, vec_y = vec_rotate(0, 1, direction)
 				local distance = Randomf(300, 400)
@@ -503,11 +506,16 @@ function OnWorldPreUpdate()
 			addWormRageFactor(player, settings.factor_active)
 			if debug then
 				print("[territorial_worms] Added " ..
-					tostring(settings.factor_active) .. " rage, new rage is " .. tostring(getWormRageFactor(player)))
+					tostring(settings.factor_active) .. " active rage, new rage is " .. tostring(getWormRageFactor(player)))
 			end
 		end
 
 		factor = addWormRageFactor(player, settings.factor_passive)
+		if debug and GameGetFrameNum() % 60 == 0 then
+			print("[territorial_worms] Added " ..
+				tostring(settings.factor_passive * 60) ..
+				" passive rage, new rage is " .. tostring(getWormRageFactor(player)))
+		end
 
 		syncWacData(player, factor)
 
@@ -521,45 +529,45 @@ function OnWorldPreUpdate()
 		::continue::
 	end
 	-- TODO: find a way to force the worms to target the player
--- 	for _, worm in ipairs(EntityGetWithTag("worm")) do
--- 		local components = EntityGetComponent(worm, "VariableStorageComponent")
--- 		if components then
--- 			for _, spawned_flag_comp in ipairs(components) do
--- 				if ComponentGetValue2(spawned_flag_comp, "name") == spawned_worm_var_name then
--- 					local components2 = EntityGetComponent(worm, "WormAIComponent")
--- 					if components2 then
--- 						local x, y = EntityGetTransform(worm)
--- 						local players = EntityGetWithTag("player_unit")
--- 						local distances = {}
--- 						for _, player in ipairs(players) do
--- 							local px, py = EntityGetTransform(player)
--- 							px, py = vec_sub(px, py, x, y)
--- 							table.insert(distances, { vec_length(px, py), player })
--- 						end
--- 						if distances[1] then
--- 							local closest_player
--- 							if distances[2] == nil then
--- 								closest_player = distances[1][2]
--- 							else
--- 								local closest_distance = -1
--- 								for _, dist in ipairs(distances) do
--- 									if closest_distance == -1 or dist[1] < closest_distance then
--- 										closest_player = dist[2]
--- 										closest_distance = dist[1]
--- 									end
--- 								end
--- 							end
--- 							for _, comp_id in ipairs(components2) do
--- 								if ComponentGetValue2(comp_id, "mTargetEntityId") ~= closest_player then
--- 									ComponentSetValue2(comp_id, "mTargetEntityId", closest_player)
--- 								end
--- 							end
--- 						end
--- 					end
--- 				end
--- 			end
--- 		end
--- 	end
+	-- 	for _, worm in ipairs(EntityGetWithTag("worm")) do
+	-- 		local components = EntityGetComponent(worm, "VariableStorageComponent")
+	-- 		if components then
+	-- 			for _, spawned_flag_comp in ipairs(components) do
+	-- 				if ComponentGetValue2(spawned_flag_comp, "name") == spawned_worm_var_name then
+	-- 					local components2 = EntityGetComponent(worm, "WormAIComponent")
+	-- 					if components2 then
+	-- 						local x, y = EntityGetTransform(worm)
+	-- 						local players = EntityGetWithTag("player_unit")
+	-- 						local distances = {}
+	-- 						for _, player in ipairs(players) do
+	-- 							local px, py = EntityGetTransform(player)
+	-- 							px, py = vec_sub(px, py, x, y)
+	-- 							table.insert(distances, { vec_length(px, py), player })
+	-- 						end
+	-- 						if distances[1] then
+	-- 							local closest_player
+	-- 							if distances[2] == nil then
+	-- 								closest_player = distances[1][2]
+	-- 							else
+	-- 								local closest_distance = -1
+	-- 								for _, dist in ipairs(distances) do
+	-- 									if closest_distance == -1 or dist[1] < closest_distance then
+	-- 										closest_player = dist[2]
+	-- 										closest_distance = dist[1]
+	-- 									end
+	-- 								end
+	-- 							end
+	-- 							for _, comp_id in ipairs(components2) do
+	-- 								if ComponentGetValue2(comp_id, "mTargetEntityId") ~= closest_player then
+	-- 									ComponentSetValue2(comp_id, "mTargetEntityId", closest_player)
+	-- 								end
+	-- 							end
+	-- 						end
+	-- 					end
+	-- 				end
+	-- 			end
+	-- 		end
+	-- 	end
 end
 
 function OnPlayerDied(player_entity)
