@@ -560,7 +560,7 @@ function OnWorldPreUpdate()
 -- 			end
 -- 		end
 -- 	end
--- end
+end
 
 function OnPlayerDied(player_entity)
 	setWormRageFactor(player_entity, 0.0)
