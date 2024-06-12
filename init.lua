@@ -10,7 +10,7 @@ local visited_sections_var_name = modid .. ".visited_sections"
 local wac_tag = "temple_areachecker"
 local spawned_worm_var_name = modid .. ".spawned_worm"
 
-local visited_cache
+local visited_cache = {}
 local timeouts = {}
 
 local settings = {
@@ -24,6 +24,7 @@ local settings = {
 	spawned_eat_ground = false,
 	spawned_bleed = false,
 	spawned_loot = false,
+	spawned_pursue = false,
 	worms_sc = {}
 }
 
@@ -32,7 +33,9 @@ local spawnable_worms = {
 	"mato",
 	"jattimato",
 	"kalmamato",
-	"helvetinmato"
+	"helvetinmato",
+	-- "suomuhauki",
+	-- "limatoukka"
 }
 
 local worm_to_xml = {
@@ -40,7 +43,9 @@ local worm_to_xml = {
 	mato = "data/entities/animals/worm.xml",
 	jattimato = "data/entities/animals/worm_big.xml",
 	kalmamato = "data/entities/animals/worm_skull.xml",
-	helvetinmato = "data/entities/animals/worm_end.xml"
+	helvetinmato = "data/entities/animals/worm_end.xml",
+	suomuhauki = "data/entities/animals/boss_dragon.xml",
+	limatoukka = "data/entities/animals/maggot_tiny/maggot_tiny.xml"
 }
 
 for _, worm in ipairs(spawnable_worms) do
@@ -60,11 +65,19 @@ local function genWormXML(worm)
 		name = spawned_worm_var_name
 	}))
 
+	if settings.spawned_pursue then
+		table.insert(xml_worm.children, nxml.new_element("LuaComponent", {
+			script_source_file = "mods/territorial_worms/files/spawned_worm_update.lua",
+			limit_to_every_n_frame = 3
+		}))
+	end
+
 	if not settings.spawned_eat_ground then
 		for component in xml_worm:each_of("CellEaterComponent") do
 			component.attr._enabled = false
 		end
 	end
+
 	if not settings.spawned_bleed then
 		for component in xml_worm:each_of("DamageModelComponent") do
 			local attr = component.attr
@@ -136,6 +149,8 @@ local function updateSettings()
 	settings.factor_active = settings.factor_active / settings.section_count
 	settings.factor_passive = settings.factor_passive / 60
 
+	settings.attraction_enabled = settings.attraction_end_radius > 0
+
 	for _, worm in ipairs(spawnable_worms) do
 		if settings.worms_sc[worm] == nil then
 			settings.worms_sc[worm] = {
@@ -154,6 +169,8 @@ local function updateSettings()
 		worm_sc_container.initial_chance = worm_sc_container.initial_chance / 100
 		worm_sc_container.max_chance = worm_sc_container.max_chance / 100
 		worm_sc_container.timeout = worm_sc_container.timeout / 60
+
+		worm_sc_container.enabled = worm_sc_container.max_chance > 0
 
 		if not after_post_init then
 			genWormXML(worm)
@@ -186,31 +203,33 @@ local function getAndCreateVisitedStorage(entity_id)
 	return getAndCreateVariableComponent(entity_id, visited_sections_var_name, "value_string")
 end
 
-local function loadVisitedSections(comp_id)
+local function loadVisitedSections(entity_id, comp_id)
 	local storage_string = ComponentGetValue2(comp_id, "value_string")
 
-	visited_cache = {}
+	local entity_cache = {}
 	for x_string, y_string in string.gmatch(storage_string, "(%d+),(%d+)") do
 		local x = tonumber(x_string) or 0
 		local y = tonumber(y_string) or 0
-		if visited_cache[y] == nil then
-			visited_cache[y] = {}
+		if entity_cache[y] == nil then
+			entity_cache[y] = {}
 		end
-		visited_cache[y][x] = true
+		entity_cache[y][x] = true
 	end
+	visited_cache[entity_id] = entity_cache
 end
 
 ---@param x integer
 ---@param y integer
 ---@param comp_id number
-local function markSectionVisited(x, y, comp_id)
-	if visited_cache[y] == nil then
-		visited_cache[y] = {}
+local function markSectionVisited(entity_id, comp_id, x, y)
+	local entity_cache = visited_cache[entity_id]
+	if entity_cache[y] == nil then
+		entity_cache[y] = {}
 	end
-	visited_cache[y][x] = true
+	entity_cache[y][x] = true
 
 	local storage_string = ""
-	for y2, column in pairs(visited_cache) do
+	for y2, column in pairs(entity_cache) do
 		for x2, visited in pairs(column) do
 			if visited then
 				storage_string = storage_string .. tostring(x2) .. "," .. tostring(y2) .. "|"
@@ -226,17 +245,18 @@ end
 ---@param y integer
 ---@return boolean visited
 local function isSectionVisited(entity_id, x, y)
-	if visited_cache == nil then
+	local entity_cache = visited_cache[entity_id]
+	if entity_cache == nil then
 		local comp_id, new = getAndCreateVisitedStorage(entity_id)
 		if new then
 			return true
 		end
-		loadVisitedSections(comp_id)
+		loadVisitedSections(entity_id, comp_id)
 	end
 	---@diagnostic disable-next-line: need-check-nil
-	local column = visited_cache[y]
+	local column = entity_cache[y]
 	if column then
-		return column[x]
+		return column[x] or false
 	end
 	return false
 end
@@ -332,7 +352,7 @@ local function doWormSpawnChance(entity_id, factor)
 
 	for worm, worm_sc in pairs(settings.worms_sc) do
 		timeouts[worm] = math.max(0, timeouts[worm] - 1)
-		if timeouts[worm] > 0 then
+		if (not worm_sc.enabled) or timeouts[worm] > 0 then
 			goto continue
 		end
 		if factor >= worm_sc.minimum_rage then
@@ -362,18 +382,22 @@ local function doWormSpawnChance(entity_id, factor)
 	frame_rand = 0
 end
 
-local debug_found = false
 local function syncWacData(entity_id, factor)
 	local comp_id = EntityGetFirstComponent(entity_id, "WormAttractorComponent", wac_tag)
-	if debug and not debug_found then
-		debug_found = true
+
+	if not settings.attraction_enabled then
+		if comp_id then
+			EntityRemoveComponent(entity_id, comp_id)
+		end
+		return
 	end
-	local radius = 0
 
 	local factor_start = settings.attraction_start_factor
 	local factor_end = settings.attraction_end_factor
 	local radius_start = settings.attraction_start_radius
 	local radius_end = settings.attraction_end_radius
+
+	local radius = 0
 
 	if factor >= factor_start then
 		radius = lerp(radius_end, radius_start, clamp(inverse_lerp(factor_start, factor_end, factor), 0, 1))
@@ -481,7 +505,7 @@ local function checkSections(entity_id)
 						print("[territorial_worms] Visited section [" ..
 							tostring(section_x) .. ", " .. tostring(section_y) .. "]!")
 					end
-					markSectionVisited(section_x, section_y, comp_id)
+					markSectionVisited(entity_id, comp_id, section_x, section_y)
 					return true
 				end
 			end
@@ -492,6 +516,7 @@ local function checkSections(entity_id)
 end
 
 function OnWorldPreUpdate()
+	local existing_players = {}
 	for _, player in ipairs(EntityGetWithTag("player_unit")) do
 		if not EntityGetIsAlive(player) then
 			goto continue
@@ -521,53 +546,19 @@ function OnWorldPreUpdate()
 
 		doWormSpawnChance(player, factor)
 
-		-- if debug then
-		-- 	local x, y = EntityGetTransform(player)
-		-- 	print(DebugBiomeMapGetFilename(x, y))
-		-- end
+		existing_players[player] = true
 
 		::continue::
 	end
-	-- TODO: find a way to force the worms to target the player
-	-- 	for _, worm in ipairs(EntityGetWithTag("worm")) do
-	-- 		local components = EntityGetComponent(worm, "VariableStorageComponent")
-	-- 		if components then
-	-- 			for _, spawned_flag_comp in ipairs(components) do
-	-- 				if ComponentGetValue2(spawned_flag_comp, "name") == spawned_worm_var_name then
-	-- 					local components2 = EntityGetComponent(worm, "WormAIComponent")
-	-- 					if components2 then
-	-- 						local x, y = EntityGetTransform(worm)
-	-- 						local players = EntityGetWithTag("player_unit")
-	-- 						local distances = {}
-	-- 						for _, player in ipairs(players) do
-	-- 							local px, py = EntityGetTransform(player)
-	-- 							px, py = vec_sub(px, py, x, y)
-	-- 							table.insert(distances, { vec_length(px, py), player })
-	-- 						end
-	-- 						if distances[1] then
-	-- 							local closest_player
-	-- 							if distances[2] == nil then
-	-- 								closest_player = distances[1][2]
-	-- 							else
-	-- 								local closest_distance = -1
-	-- 								for _, dist in ipairs(distances) do
-	-- 									if closest_distance == -1 or dist[1] < closest_distance then
-	-- 										closest_player = dist[2]
-	-- 										closest_distance = dist[1]
-	-- 									end
-	-- 								end
-	-- 							end
-	-- 							for _, comp_id in ipairs(components2) do
-	-- 								if ComponentGetValue2(comp_id, "mTargetEntityId") ~= closest_player then
-	-- 									ComponentSetValue2(comp_id, "mTargetEntityId", closest_player)
-	-- 								end
-	-- 							end
-	-- 						end
-	-- 					end
-	-- 				end
-	-- 			end
-	-- 		end
-	-- 	end
+	local cache_to_clean = {}
+	for entity_id, _ in pairs(visited_cache) do
+		if not existing_players[entity_id] then
+			table.insert(cache_to_clean, entity_id)
+		end
+	end
+	for _, entity_id in ipairs(cache_to_clean) do
+		visited_cache[entity_id] = nil
+	end
 end
 
 function OnPlayerDied(player_entity)

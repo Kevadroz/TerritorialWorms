@@ -2,7 +2,7 @@
 dofile_once("data/scripts/lib/mod_settings.lua")
 -- dofile_once("data/scripts/lib/utilities.lua")
 
-local mod_id = "territorial_worms"
+local modid = "territorial_worms"
 mod_settings_version = 1
 
 ---@param number number?
@@ -58,7 +58,6 @@ FadeTimes = {}
 ---@param in_main_menu boolean
 ---@param im_id integer
 ---@param setting table
----@diagnostic disable-next-line: redefined-local
 local function mod_setting_number_with_field(mod_id, gui, in_main_menu, im_id, setting)
 	---@diagnostic disable-next-line: unused-local
 	local debugF = DebugGetIsDevBuild() and setting.id == "factor_active"
@@ -120,7 +119,7 @@ local function mod_setting_number_with_field(mod_id, gui, in_main_menu, im_id, s
 			GuiText(gui, 3, 0, display_prefix)
 		end
 		local value_new_text = GuiTextInput(gui, im_id, 0, 0, value_text, 100, 255, text_input_chars)
-		local _, _, textbox_hovered = GuiGetPreviousWidgetInfo(gui)
+		local _, textbox_reset, textbox_hovered = GuiGetPreviousWidgetInfo(gui)
 		setting_hovered = textbox_hovered
 
 		if textbox_hovered then
@@ -186,11 +185,18 @@ local function mod_setting_number_with_field(mod_id, gui, in_main_menu, im_id, s
 					numeric_new_val = setting.value_min
 				end
 
+				if textbox_reset then
+					value_new_text = simple_tostring(setting.value_default)
+					GamePlaySound("data/audio/Desktop/ui.bank", "ui/button_click", 0, 0)
+				end
 				HoldedString = value_new_text
 			end
 		end
 
 		value_new = math.min(setting.value_max, math.max(setting.value_min, numeric_new_val))
+		if textbox_reset then
+			value_new = setting.value_default
+		end
 	else
 		local slider_max = setting.slider_max or setting.value_max
 		local slider_min = setting.slider_min or setting.value_min
@@ -285,11 +291,34 @@ local function mod_setting_number_with_field(mod_id, gui, in_main_menu, im_id, s
 	GuiIdPop(gui)
 end
 
----@diagnostic disable-next-line: redefined-local
 local function callback_force_integer(mod_id, _, _, setting, _, new_value)
 	local new_new_value = math.floor(new_value + 0.5)
 	if new_new_value ~= new_value then
 		ModSettingSetNextValue(mod_setting_get_id(mod_id, setting), new_new_value, false)
+	end
+end
+
+local function callback_force_min(mod_id, _, _, setting, _, new_value)
+	local setting_id = mod_setting_get_id(mod_id, setting)
+	if setting.min_id then
+		local min_id = mod_setting_get_id(mod_id, { id = setting.min_id })
+		if ModSettingGetNextValue(min_id) > new_value then
+			ModSettingSetNextValue(min_id, new_value, false)
+		end
+	else
+		error("'" .. setting_id .. "' is missing the field 'min_id'")
+	end
+end
+
+local function callback_force_max(mod_id, _, _, setting, _, new_value)
+	local setting_id = mod_setting_get_id(mod_id, setting)
+	if setting.max_id then
+		local max_id = mod_setting_get_id(mod_id, { id = setting.max_id })
+		if ModSettingGetNextValue(max_id) < new_value then
+			ModSettingSetNextValue(max_id, new_value, false)
+		end
+	else
+		error("'" .. setting_id .. "' is missing the field 'max_id'")
 	end
 end
 
@@ -360,7 +389,9 @@ mod_settings = {
 				slider_displayed_decimals = 2,
 				decimal_limit = 6,
 				scope = MOD_SETTING_SCOPE_RUNTIME,
-				ui_fn = mod_setting_number_with_field
+				ui_fn = mod_setting_number_with_field,
+				change_fn = callback_force_max,
+				max_id = "attraction_end_factor"
 			},
 			{
 				id = "attraction_end_factor",
@@ -373,7 +404,9 @@ mod_settings = {
 				slider_displayed_decimals = 2,
 				decimal_limit = 6,
 				scope = MOD_SETTING_SCOPE_RUNTIME,
-				ui_fn = mod_setting_number_with_field
+				ui_fn = mod_setting_number_with_field,
+				change_fn = callback_force_min,
+				min_id = "attraction_start_factor"
 			},
 			{
 				id = "attraction_start_radius",
@@ -382,16 +415,20 @@ mod_settings = {
 				value_default = 1,
 				value_min = 0,
 				value_max = 100,
-				scope = MOD_SETTING_SCOPE_RUNTIME
+				scope = MOD_SETTING_SCOPE_RUNTIME,
+				change_fn = callback_force_max,
+				max_id = "attraction_end_radius"
 			},
 			{
 				id = "attraction_end_radius",
 				ui_name = "Final Radius",
-				ui_description = "The radius you attract worms at the maximum rage.",
+				ui_description = "The radius you attract worms at the maximum rage.\n(Set to 0 to disable)",
 				value_default = 100,
 				value_min = 0,
 				value_max = 100,
-				scope = MOD_SETTING_SCOPE_RUNTIME
+				scope = MOD_SETTING_SCOPE_RUNTIME,
+				change_fn = callback_force_min,
+				min_id = "attraction_start_radius"
 			}
 		}
 	},
@@ -400,6 +437,13 @@ mod_settings = {
 		ui_name = "Worm Settings",
 		ui_description = "Configure the worms spawned by rage.",
 		settings = {
+			{
+				id = "spawned_pursue",
+				ui_name = "Pursue Player",
+				ui_description = "The worms will relentlesly chase the player.",
+				value_default = true,
+				scope = MOD_SETTING_SCOPE_RUNTIME_RESTART
+			},
 			{
 				id = "spawned_eat_ground",
 				ui_name = "Destroy Terrain",
@@ -410,7 +454,8 @@ mod_settings = {
 			{
 				id = "spawned_bleed",
 				ui_name = "Enable Worm Blood",
-				ui_description = "If disabled the worms that bleed worm blood won't bleed,\nas a side effect the worms won't leave corpses behind..",
+				ui_description =
+				"If disabled the worms that bleed worm blood won't bleed,\nas a side effect the worms won't leave corpses behind..",
 				value_default = false,
 				scope = MOD_SETTING_SCOPE_RUNTIME_RESTART
 			},
@@ -420,7 +465,7 @@ mod_settings = {
 				ui_description = "The worms drop any loot they usually whould.",
 				value_default = false,
 				scope = MOD_SETTING_SCOPE_RUNTIME_RESTART
-			},
+			}
 		}
 	},
 	{
@@ -445,6 +490,7 @@ mod_settings = {
 ---@param initial_chance integer
 ---@param top_chance integer
 local function GenSCSettings(id, display_name, minimum_rage, top_rage, initial_chance, top_chance, timeout, icon)
+	display_name = GameTextGetTranslatedOrNot(display_name)
 	table.insert(sc_settings, {
 		category_id = id,
 		ui_name = display_name,
@@ -459,11 +505,13 @@ local function GenSCSettings(id, display_name, minimum_rage, top_rage, initial_c
 				value_default = minimum_rage,
 				value_min = 0,
 				value_max = 10000,
-				slider_max = 50,
+				slider_max = math.max(50, minimum_rage),
 				slider_displayed_decimals = 2,
 				decimal_limit = 3,
 				scope = MOD_SETTING_SCOPE_RUNTIME,
-				ui_fn = mod_setting_number_with_field
+				ui_fn = mod_setting_number_with_field,
+				change_fn = callback_force_max,
+				max_id = "sc_" .. id .. "_top_rage"
 			},
 			{
 				id = "sc_" .. id .. "_top_rage",
@@ -472,11 +520,13 @@ local function GenSCSettings(id, display_name, minimum_rage, top_rage, initial_c
 				value_default = top_rage,
 				value_min = 0,
 				value_max = 10000,
-				slider_max = 50,
+				slider_max = math.max(50, top_rage),
 				slider_displayed_decimals = 2,
 				decimal_limit = 3,
 				scope = MOD_SETTING_SCOPE_RUNTIME,
-				ui_fn = mod_setting_number_with_field
+				ui_fn = mod_setting_number_with_field,
+				change_fn = callback_force_min,
+				min_id = "sc_" .. id .. "_minimum_rage"
 			},
 			{
 				id = "sc_" .. id .. "_initial_chance",
@@ -486,27 +536,31 @@ local function GenSCSettings(id, display_name, minimum_rage, top_rage, initial_c
 				value_default = initial_chance,
 				value_min = 0,
 				value_max = 100,
-				slider_max = 25,
+				slider_max = math.max(25, initial_chance),
 				slider_displayed_decimals = 2,
 				decimal_limit = 6,
 				value_display_formatting = " $0%",
 				scope = MOD_SETTING_SCOPE_RUNTIME,
-				ui_fn = mod_setting_number_with_field
+				ui_fn = mod_setting_number_with_field,
+				change_fn = callback_force_max,
+				max_id = "sc_" .. id .. "_max_chance"
 			},
 			{
 				id = "sc_" .. id .. "_max_chance",
 				ui_name = "Maximum Chance",
 				ui_description = "The probability with which a " ..
-					 display_name .. " will randomly spawn\nat the maximum rage each second.",
+					 display_name .. " will randomly spawn\nat the maximum rage each second.\n(Set to 0 to disable)",
 				value_default = top_chance,
-				value_min = 0.00000001,
+				value_min = 0,
 				value_max = 100,
-				slider_max = 25,
+				slider_max = math.max(25, top_chance),
 				slider_displayed_decimals = 2,
 				decimal_limit = 6,
 				value_display_formatting = " $0%",
 				scope = MOD_SETTING_SCOPE_RUNTIME,
-				ui_fn = mod_setting_number_with_field
+				ui_fn = mod_setting_number_with_field,
+				change_fn = callback_force_min,
+				min_id = "sc_" .. id .. "_initial_chance"
 			},
 			{
 				id = "sc_" .. id .. "_timeout",
@@ -515,7 +569,7 @@ local function GenSCSettings(id, display_name, minimum_rage, top_rage, initial_c
 				value_default = timeout,
 				value_min = 0,
 				value_max = 5000,
-				slider_max = 60,
+				slider_max = math.max(60, timeout),
 				slider_displayed_decimals = 1,
 				decimal_limit = 2,
 				value_display_formatting = " $0s",
@@ -526,23 +580,40 @@ local function GenSCSettings(id, display_name, minimum_rage, top_rage, initial_c
 	})
 end
 
-GenSCSettings("pikkumato", "Pikkumato", 1, 25, 0, 25, 0, "data/ui_gfx/animal_icons/worm_tiny.png")
-GenSCSettings("mato", "Mato", 3, 20, 0, 5, 2, "data/ui_gfx/animal_icons/worm.png")
-GenSCSettings("jattimato", "Jättimato", 5, 15, 0, 2.5, 5, "data/ui_gfx/animal_icons/worm_big.png")
-GenSCSettings("kalmamato", "Kalmamato", 10, 20, 0, 1.2, 10, "data/ui_gfx/animal_icons/worm_skull.png")
-GenSCSettings("helvetinmato", "Helvetinmato", 20, 35, 0, 0.5, 25, "data/ui_gfx/animal_icons/worm_end.png")
+local limatoukka_name
+local year,month,day,hour,minute,second = GameGetDateAndTimeLocal()
+local time = second + minute * 60 + hour * 3600 + day * 86400 + month * 2678400 + year * 32140800
+math.randomseed(time)
+if math.random() > 0.95 then
+	limatoukka_name = "tiny"
+else
+	limatoukka_name = "$animal_maggot_tiny"
+end
+
+GenSCSettings("pikkumato", "$animal_worm_tiny", 1, 25, 0, 25, 0.5, "data/ui_gfx/animal_icons/worm_tiny.png")
+GenSCSettings("mato", "$animal_worm", 3, 20, 0, 5, 2, "data/ui_gfx/animal_icons/worm.png")
+GenSCSettings("jattimato", "$animal_worm_big", 5, 15, 0, 2.5, 5, "data/ui_gfx/animal_icons/worm_big.png")
+GenSCSettings("kalmamato", "$animal_worm_skull", 10, 20, 0, 1.2, 10, "data/ui_gfx/animal_icons/worm_skull.png")
+GenSCSettings("helvetinmato", "$animal_worm_end", 20, 35, 0, 0.5, 25, "data/ui_gfx/animal_icons/worm_end.png")
+table.insert(sc_settings, {
+	category_id = "sc_non_implemented",
+	ui_name = "v Not Implemented v",
+	settings = {}
+})
+GenSCSettings("suomuhauki", "$animal_boss_dragon", 50, 80, 0, 0, 60, "data/ui_gfx/animal_icons/boss_dragon.png")
+GenSCSettings("limatoukka", limatoukka_name, 85, 135, 0, 0, 180, "data/ui_gfx/animal_icons/maggot_tiny.png")
 
 function ModSettingsUpdate(init_scope)
 	---@diagnostic disable-next-line: unused-local
-	local old_version = mod_settings_get_version(mod_id) -- This can be used to migrate some settings between mod versions.
-	mod_settings_update(mod_id, mod_settings, init_scope)
+	local old_version = mod_settings_get_version(modid) -- This can be used to migrate some settings between mod versions.
+	mod_settings_update(modid, mod_settings, init_scope)
 end
 
 function ModSettingsGuiCount()
-	return mod_settings_gui_count(mod_id, mod_settings)
+	return mod_settings_gui_count(modid, mod_settings)
 end
 
-function custom_mod_setting_category_button(_, gui, im_id, im_id2, im_id3, category)
+function custom_mod_setting_category_button(_, gui, im_id, im_id2, im_id3, im_id4, category)
 	local image_file = "data/ui_gfx/button_fold_close.png"
 	if category._folded then
 		image_file = "data/ui_gfx/button_fold_open.png"
@@ -551,7 +622,9 @@ function custom_mod_setting_category_button(_, gui, im_id, im_id2, im_id3, categ
 	GuiLayoutBeginHorizontal(gui, 0, 0)
 	GuiIdPush(gui, 892304589)
 	if category.icon then
-		GuiImage(gui, im_id3, 0, 0, category.icon, 1, 0.5)
+		GuiZSetForNextWidget(gui, 2)
+		GuiImage(gui, im_id4, 0, 0, "mods/territorial_worms/files/settings_icon_background.png", 1, 0.5)
+		GuiImage(gui, im_id3, -10, 0, category.icon, 1, 0.5)
 	end
 
 	GuiOptionsAddForNextWidget(gui, GUI_OPTION.DrawSemiTransparent)
@@ -578,7 +651,6 @@ function custom_mod_setting_category_button(_, gui, im_id, im_id2, im_id3, categ
 	return clicked
 end
 
----@diagnostic disable-next-line: redefined-local
 local function custom_mod_settings_gui(mod_id, settings, gui, in_main_menu)
 	local im_id = 1
 
@@ -589,10 +661,12 @@ local function custom_mod_settings_gui(mod_id, settings, gui, in_main_menu)
 			if setting.foldable then
 				local im_id3 = im_id
 				im_id = im_id + 1
+				local im_id4 = im_id
+				im_id = im_id + 1
 				local im_id2 = im_id
 				im_id = im_id + 1
 				local clicked_category_heading = custom_mod_setting_category_button(mod_id, gui, im_id, im_id2, im_id3,
-					setting)
+					im_id4, setting)
 				if not setting._folded then
 					GuiAnimateBegin(gui)
 					GuiAnimateAlphaFadeIn(gui, 3458923234, 0.1, 0.0, clicked_category_heading)
@@ -607,9 +681,10 @@ local function custom_mod_settings_gui(mod_id, settings, gui, in_main_menu)
 				GuiOptionsAddForNextWidget(gui, GUI_OPTION.DrawSemiTransparent)
 				GuiText(gui, mod_setting_group_x_offset, 0, setting.ui_name)
 				if setting.icon then
-					GuiImage(gui, im_id, 0, 0, setting.icon, 1, 0.5)
+					GuiImage(gui, im_id, 0, 0, "mods/territorial_worms/files/settings_icon_background.png", 1, 0.5)
+					GuiImage(gui, im_id + 1, -10, 0, setting.icon, 1, 0.5)
+					im_id = im_id + 2
 				end
-				im_id = im_id + 1
 				GuiLayoutEnd(gui)
 				if is_visible_string(setting.ui_description) then
 					GuiTooltip(gui, setting.ui_description, "")
@@ -647,5 +722,5 @@ local function custom_mod_settings_gui(mod_id, settings, gui, in_main_menu)
 end
 
 function ModSettingsGui(gui, in_main_menu)
-	custom_mod_settings_gui(mod_id, mod_settings, gui, in_main_menu)
+	custom_mod_settings_gui(modid, mod_settings, gui, in_main_menu)
 end
