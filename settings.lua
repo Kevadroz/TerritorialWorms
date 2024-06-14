@@ -203,7 +203,7 @@ local function mod_setting_number_with_field(mod_id, gui, in_main_menu, im_id, s
 
 		value_new = GuiSlider(gui, im_id, mod_setting_group_x_offset, 0, setting.ui_name,
 			clamp(value, slider_min, slider_max),
-			slider_min, slider_max, setting.value_default, 1, " ", 64)
+			slider_min, slider_max, setting.value_default, 1, " ", setting.slider_width or 64)
 		local _, _, slider_hovered = GuiGetPreviousWidgetInfo(gui)
 		setting_hovered = slider_hovered
 
@@ -322,6 +322,105 @@ local function callback_force_max(mod_id, _, _, setting, _, new_value)
 	end
 end
 
+local function GenWormSettings(prefix, defaults)
+	if prefix == nil then
+		error("missing prefix")
+	else
+		prefix = prefix .. "."
+	end
+	if defaults == nil then
+		defaults = {}
+	end
+	if defaults.pursue == nil then
+		defaults.pursue = true
+	end
+	if defaults.mode == nil then
+		defaults.mode = "normal"
+	end
+	if defaults.eat_ground == nil then
+		defaults.eat_ground = true
+	end
+	if defaults.bleed == nil then
+		defaults.bleed = false
+	end
+	if defaults.loot == nil then
+		defaults.loot = false
+	end
+	if defaults.despawn_time == nil then
+		defaults.despawn_time = 30
+	end
+	if defaults.no_gravity == nil then
+		defaults.no_gravity = false
+	end
+	return {
+		{
+			id = prefix .. "pursue",
+			ui_name = "Pursue Player",
+			ui_description = "The worms will relentlesly chase the player.",
+			value_default = defaults.pursue,
+			scope = MOD_SETTING_SCOPE_RUNTIME_RESTART
+		},
+		{
+			id = prefix .. "mode",
+			ui_name = "Mode",
+			ui_description =
+			"Normal - Regular worms.\nIllusory - Worms will be unhittable and will despawn after a while.",
+			value_default = defaults.mode,
+			values = { { "normal", "Normal" }, { "illusion", "Illusory" } },
+			scope = MOD_SETTING_SCOPE_RUNTIME_RESTART,
+			act_as_category = true,
+			settings = {
+				{
+					id = prefix .. "eat_ground",
+					ui_name = "Destroy Terrain",
+					ui_description = "The worms break the ground they pass by.",
+					value_default = defaults.eat_ground,
+					scope = MOD_SETTING_SCOPE_RUNTIME_RESTART
+				},
+				{
+					id = prefix .. "bleed",
+					ui_name = "Enable Worm Blood",
+					ui_description =
+					"If disabled the worms that bleed worm blood won't bleed,\nas a side effect the worms won't leave corpses behind.",
+					value_default = defaults.bleed,
+					scope = MOD_SETTING_SCOPE_RUNTIME_RESTART
+				},
+				{
+					id = prefix .. "loot",
+					ui_name = "Drop Loot",
+					ui_description = "The worms drop any loot they usually whould.",
+					value_default = defaults.loot,
+					scope = MOD_SETTING_SCOPE_RUNTIME_RESTART
+				},
+				{
+					id = prefix .. "despawn_time",
+					ui_name = "Despawn Time",
+					ui_description =
+					"How long since until the worms despawn from when they spawned.\n(Set to 0 to disable despawning)",
+					value_default = defaults.despawn_time,
+					value_min = 0,
+					value_max = 20000,
+					slider_max = 300,
+					slider_displayed_decimals = 2,
+					slider_width = 96,
+					decimal_limit = 3,
+					value_display_formatting = " $0s",
+					scope = MOD_SETTING_SCOPE_RUNTIME_RESTART,
+					ui_fn = mod_setting_number_with_field
+				},
+				{
+					id = prefix .. "no_gravity",
+					ui_name = "Enable Flight",
+					ui_description = "The worms will be able to fly through the air.",
+					value_default = defaults.no_gravity,
+					scope = MOD_SETTING_SCOPE_RUNTIME_RESTART
+				},
+			}
+		}
+	}
+end
+local general_worm_settings = GenWormSettings("spawned")
+
 local sc_settings = {}
 ---@diagnostic disable-next-line: lowercase-global
 mod_settings = {
@@ -397,7 +496,7 @@ mod_settings = {
 				id = "attraction_end_factor",
 				ui_name = "Rage Ceiling",
 				ui_description = "Amount of rage where the attraction radius is at its maximum.",
-				value_default = 10,
+				value_default = 17.5,
 				value_min = 0,
 				value_max = 10000,
 				slider_max = 100,
@@ -412,21 +511,29 @@ mod_settings = {
 				id = "attraction_start_radius",
 				ui_name = "Initial Radius",
 				ui_description = "The radius you attract worms at the minimum rage.",
-				value_default = 1,
+				value_default = 0,
 				value_min = 0,
-				value_max = 100,
+				value_max = 10000,
+				slider_displayed_decimals = 0,
+				decimal_limit = 2,
 				scope = MOD_SETTING_SCOPE_RUNTIME,
+				ui_fn = mod_setting_number_with_field,
 				change_fn = callback_force_max,
 				max_id = "attraction_end_radius"
 			},
 			{
 				id = "attraction_end_radius",
 				ui_name = "Final Radius",
-				ui_description = "The radius you attract worms at the maximum rage.\n(Set to 0 to disable)",
-				value_default = 100,
+				ui_description =
+				"The radius you attract worms at the maximum rage.\n(Set to 0 to disable the attraction entirely)",
+				value_default = 1000,
 				value_min = 0,
-				value_max = 100,
+				value_max = 10000,
+				slider_max = 1000,
+				slider_displayed_decimals = 0,
+				decimal_limit = 2,
 				scope = MOD_SETTING_SCOPE_RUNTIME,
+				ui_fn = mod_setting_number_with_field,
 				change_fn = callback_force_min,
 				min_id = "attraction_start_radius"
 			}
@@ -436,37 +543,7 @@ mod_settings = {
 		category_id = "worm_settings",
 		ui_name = "Worm Settings",
 		ui_description = "Configure the worms spawned by rage.",
-		settings = {
-			{
-				id = "spawned_pursue",
-				ui_name = "Pursue Player",
-				ui_description = "The worms will relentlesly chase the player.",
-				value_default = true,
-				scope = MOD_SETTING_SCOPE_RUNTIME_RESTART
-			},
-			{
-				id = "spawned_eat_ground",
-				ui_name = "Destroy Terrain",
-				ui_description = "The worms break the ground they pass by.",
-				value_default = true,
-				scope = MOD_SETTING_SCOPE_RUNTIME_RESTART
-			},
-			{
-				id = "spawned_bleed",
-				ui_name = "Enable Worm Blood",
-				ui_description =
-				"If disabled the worms that bleed worm blood won't bleed,\nas a side effect the worms won't leave corpses behind..",
-				value_default = false,
-				scope = MOD_SETTING_SCOPE_RUNTIME_RESTART
-			},
-			{
-				id = "spawned_loot",
-				ui_name = "Drop Loot",
-				ui_description = "The worms drop any loot they usually whould.",
-				value_default = false,
-				scope = MOD_SETTING_SCOPE_RUNTIME_RESTART
-			}
-		}
+		settings = general_worm_settings
 	},
 	{
 		category_id = "spawn_conditions",
@@ -483,14 +560,66 @@ mod_settings = {
 	}
 }
 
+local wms_visibility_modes = {
+	eat_ground = { "normal" },
+	bleed = { "normal" },
+	loot = { "normal" },
+	despawn_time = { "illusion" },
+	no_gravity = { "normal" }
+}
+
+for _, conditions in pairs(wms_visibility_modes) do
+	for index, mode_name in ipairs(conditions) do
+		conditions[mode_name] = true
+		conditions[index] = nil
+	end
+end
+
+local function UpdateWormModeSettingsVisibility(worm_settings)
+	local mode
+	local worm_mode_settings
+	for _, setting in ipairs(worm_settings) do
+		if setting.id then
+			local index = string.find(setting.id, "%.[^%.]*$") + 1
+			if string.sub(setting.id, index, -1) == "mode" then
+				mode = ModSettingGetNextValue(mod_setting_get_id(modid, setting)) or setting.default_value
+				worm_mode_settings = setting.aac_settings
+			end
+		end
+	end
+	for _, setting in ipairs(worm_mode_settings) do
+		index = string.find(setting.id, "%.[^%.]*$") + 1
+		setting.hidden = not (wms_visibility_modes[string.sub(setting.id, index, -1)][mode] or false)
+	end
+end
+local function UpdateWormOverridesVisibility()
+	for _, worm in ipairs(sc_settings) do
+		if worm.settings then
+			for _, setting in ipairs(worm.settings) do
+				if setting.id and string.sub(setting.id, -18, -1) == "_overrides_enabled" then
+					local enabled = ModSettingGetNextValue(mod_setting_get_id(modid, setting))
+					for _, override_setting in ipairs(setting.aac_settings) do
+						override_setting.hidden = not enabled
+					end
+					if enabled then
+						UpdateWormModeSettingsVisibility(setting.aac_settings)
+					end
+				end
+			end
+		end
+	end
+end
+
 ---@param id string
 ---@param display_name string
 ---@param minimum_rage integer
 ---@param top_rage integer
 ---@param initial_chance integer
 ---@param top_chance integer
-local function GenSCSettings(id, display_name, minimum_rage, top_rage, initial_chance, top_chance, timeout, icon)
+local function GenSCSettings(id, display_name, minimum_rage, top_rage, initial_chance, top_chance, timeout, max_loaded, icon,
+									  override_defaults)
 	display_name = GameTextGetTranslatedOrNot(display_name)
+	local overrides_prefix = "sc_" .. id .. "_overrides"
 	table.insert(sc_settings, {
 		category_id = id,
 		ui_name = display_name,
@@ -549,7 +678,7 @@ local function GenSCSettings(id, display_name, minimum_rage, top_rage, initial_c
 				id = "sc_" .. id .. "_max_chance",
 				ui_name = "Maximum Chance",
 				ui_description = "The probability with which a " ..
-					 display_name .. " will randomly spawn\nat the maximum rage each second.\n(Set to 0 to disable)",
+					 display_name .. " will randomly spawn\nat the maximum rage each second.\n(Set to 0 to disable this worm)",
 				value_default = top_chance,
 				value_min = 0,
 				value_max = 100,
@@ -570,18 +699,38 @@ local function GenSCSettings(id, display_name, minimum_rage, top_rage, initial_c
 				value_min = 0,
 				value_max = 5000,
 				slider_max = math.max(60, timeout),
-				slider_displayed_decimals = 1,
-				decimal_limit = 2,
+				decimal_limit = 0,
 				value_display_formatting = " $0s",
 				scope = MOD_SETTING_SCOPE_RUNTIME,
 				ui_fn = mod_setting_number_with_field
+			},
+			{
+				id = "sc_" .. id .. "_max_loaded",
+				ui_name = "Count Limit",
+				ui_description = "The amount of spawned " .. display_name .. " that can be loaded at the same time.\n(Set to 0 to not limit this)",
+				value_default = max_loaded,
+				value_min = 0,
+				value_max = 1000,
+				slider_max = 100,
+				decimal_limit = 0,
+				scope = MOD_SETTING_SCOPE_RUNTIME,
+				ui_fn = mod_setting_number_with_field
+			},
+			{
+				id = overrides_prefix .. "_enabled",
+				ui_name = "Overrides",
+				ui_description = "If enabled the next settings will override those in \"Worm settings\".",
+				value_default = override_defaults ~= nil,
+				act_as_category = true,
+				scope = MOD_SETTING_SCOPE_RUNTIME_RESTART,
+				settings = GenWormSettings(overrides_prefix, override_defaults)
 			}
 		}
 	})
 end
 
 local limatoukka_name
-local year,month,day,hour,minute,second = GameGetDateAndTimeLocal()
+local year, month, day, hour, minute, second = GameGetDateAndTimeLocal()
 local time = second + minute * 60 + hour * 3600 + day * 86400 + month * 2678400 + year * 32140800
 math.randomseed(time)
 if math.random() > 0.95 then
@@ -590,18 +739,45 @@ else
 	limatoukka_name = "$animal_maggot_tiny"
 end
 
-GenSCSettings("pikkumato", "$animal_worm_tiny", 1, 25, 0, 25, 0.5, "data/ui_gfx/animal_icons/worm_tiny.png")
-GenSCSettings("mato", "$animal_worm", 3, 20, 0, 5, 2, "data/ui_gfx/animal_icons/worm.png")
-GenSCSettings("jattimato", "$animal_worm_big", 5, 15, 0, 2.5, 5, "data/ui_gfx/animal_icons/worm_big.png")
-GenSCSettings("kalmamato", "$animal_worm_skull", 10, 20, 0, 1.2, 10, "data/ui_gfx/animal_icons/worm_skull.png")
-GenSCSettings("helvetinmato", "$animal_worm_end", 20, 35, 0, 0.5, 25, "data/ui_gfx/animal_icons/worm_end.png")
+GenSCSettings("pikkumato", "$animal_worm_tiny", 1, 25, 0, 25, 0.5, 20, "data/ui_gfx/animal_icons/worm_tiny.png")
+GenSCSettings("mato", "$animal_worm", 3, 20, 0, 5, 2, 15, "data/ui_gfx/animal_icons/worm.png")
+GenSCSettings("jattimato", "$animal_worm_big", 5, 15, 0, 2.5, 5, 10, "data/ui_gfx/animal_icons/worm_big.png")
+GenSCSettings("kalmamato", "$animal_worm_skull", 10, 20, 0, 1.2, 10, 7, "data/ui_gfx/animal_icons/worm_skull.png")
+GenSCSettings("helvetinmato", "$animal_worm_end", 20, 35, 0, 0.5, 25, 5, "data/ui_gfx/animal_icons/worm_end.png")
 table.insert(sc_settings, {
 	category_id = "sc_non_implemented",
-	ui_name = "v Not Implemented v",
+	ui_name = "v Not Implemented yet v",
 	settings = {}
 })
-GenSCSettings("suomuhauki", "$animal_boss_dragon", 50, 80, 0, 0, 60, "data/ui_gfx/animal_icons/boss_dragon.png")
-GenSCSettings("limatoukka", limatoukka_name, 85, 135, 0, 0, 180, "data/ui_gfx/animal_icons/maggot_tiny.png")
+GenSCSettings("suomuhauki", "$animal_boss_dragon", 50, 80, 0, 0, 60, 3, "data/ui_gfx/animal_icons/boss_dragon.png")
+GenSCSettings("limatoukka", limatoukka_name, 85, 135, 0, 0, 180, 2, "data/ui_gfx/animal_icons/maggot_tiny.png", {
+	mode = "illusion"
+})
+
+local function SplitSettingsWithChilds(settings)
+	local to_insert = {}
+	for _, setting in ipairs(settings) do
+		if setting.category_id and setting.settings then
+			SplitSettingsWithChilds(setting.settings)
+		elseif setting.act_as_category and setting.settings then
+			local new_category = {
+				category_id = setting.id .. "_category",
+				ui_name = "dummy",
+				hidden = true,
+				settings = setting.settings
+			}
+			setting.aac_settings = setting.settings
+			setting.settings = nil
+			SplitSettingsWithChilds(new_category.settings)
+			table.insert(to_insert, new_category)
+		end
+	end
+	for _, category in ipairs(to_insert) do
+		table.insert(settings, category)
+	end
+end
+SplitSettingsWithChilds(mod_settings)
+UpdateWormModeSettingsVisibility(general_worm_settings)
 
 function ModSettingsUpdate(init_scope)
 	---@diagnostic disable-next-line: unused-local
@@ -609,8 +785,28 @@ function ModSettingsUpdate(init_scope)
 	mod_settings_update(modid, mod_settings, init_scope)
 end
 
+local function custom_mod_settings_gui_count(mod_id, settings)
+	local result = 0
+
+	for _, setting in ipairs(settings) do
+		if setting.category_id ~= nil then
+			result = result + custom_mod_settings_gui_count(mod_id, setting.settings)
+		else
+			local visible = (setting.hidden == nil or not setting.hidden)
+			if visible then
+				result = result + 1
+				if setting.act_as_category then
+					result = result + custom_mod_settings_gui_count(mod_id, setting.aac_settings)
+				end
+			end
+		end
+	end
+
+	return result
+end
+
 function ModSettingsGuiCount()
-	return mod_settings_gui_count(modid, mod_settings)
+	return custom_mod_settings_gui_count(modid, mod_settings)
 end
 
 function custom_mod_setting_category_button(_, gui, im_id, im_id2, im_id3, im_id4, category)
@@ -651,69 +847,82 @@ function custom_mod_setting_category_button(_, gui, im_id, im_id2, im_id3, im_id
 	return clicked
 end
 
-local function custom_mod_settings_gui(mod_id, settings, gui, in_main_menu)
-	local im_id = 1
+local function custom_mod_settings_gui(mod_id, settings, gui, in_main_menu, im_id)
+	im_id = im_id or 1
 
-	for i, setting in ipairs(settings) do
+	for _, setting in ipairs(settings) do
 		if setting.category_id ~= nil then
-			-- setting category
-			GuiIdPush(gui, im_id)
-			if setting.foldable then
-				local im_id3 = im_id
-				im_id = im_id + 1
-				local im_id4 = im_id
-				im_id = im_id + 1
-				local im_id2 = im_id
-				im_id = im_id + 1
-				local clicked_category_heading = custom_mod_setting_category_button(mod_id, gui, im_id, im_id2, im_id3,
-					im_id4, setting)
-				if not setting._folded then
-					GuiAnimateBegin(gui)
-					GuiAnimateAlphaFadeIn(gui, 3458923234, 0.1, 0.0, clicked_category_heading)
-					mod_setting_group_x_offset = mod_setting_group_x_offset + 6
+			if setting.hidden ~= false and setting.ui_name ~= "dummy" then
+				GuiIdPush(gui, im_id)
+				if setting.foldable then
+					local im_id3 = im_id
+					im_id = im_id + 1
+					local im_id4 = im_id
+					im_id = im_id + 1
+					local im_id2 = im_id
+					im_id = im_id + 1
+					local clicked_category_heading = custom_mod_setting_category_button(mod_id, gui, im_id, im_id2, im_id3,
+						im_id4, setting)
+					if not setting._folded then
+						GuiAnimateBegin(gui)
+						GuiAnimateAlphaFadeIn(gui, 3458923234, 0.1, 0.0, clicked_category_heading)
+						mod_setting_group_x_offset = mod_setting_group_x_offset + 6
+						custom_mod_settings_gui(mod_id, setting.settings, gui, in_main_menu)
+						mod_setting_group_x_offset = mod_setting_group_x_offset - 6
+						GuiAnimateEnd(gui)
+						GuiLayoutAddVerticalSpacing(gui, 4)
+					end
+				else
+					GuiLayoutBeginHorizontal(gui, 0, 0)
+					GuiOptionsAddForNextWidget(gui, GUI_OPTION.DrawSemiTransparent)
+					GuiText(gui, mod_setting_group_x_offset, 0, setting.ui_name)
+					if setting.icon then
+						GuiImage(gui, im_id, 0, 0, "mods/territorial_worms/files/settings_icon_background.png", 1, 0.5)
+						GuiImage(gui, im_id + 1, -10, 0, setting.icon, 1, 0.5)
+						im_id = im_id + 2
+					end
+					GuiLayoutEnd(gui)
+					if is_visible_string(setting.ui_description) then
+						GuiTooltip(gui, setting.ui_description, "")
+					end
+					mod_setting_group_x_offset = mod_setting_group_x_offset + 2
 					custom_mod_settings_gui(mod_id, setting.settings, gui, in_main_menu)
-					mod_setting_group_x_offset = mod_setting_group_x_offset - 6
-					GuiAnimateEnd(gui)
+					mod_setting_group_x_offset = mod_setting_group_x_offset - 2
 					GuiLayoutAddVerticalSpacing(gui, 4)
 				end
-			else
-				GuiLayoutBeginHorizontal(gui, 0, 0)
-				GuiOptionsAddForNextWidget(gui, GUI_OPTION.DrawSemiTransparent)
-				GuiText(gui, mod_setting_group_x_offset, 0, setting.ui_name)
-				if setting.icon then
-					GuiImage(gui, im_id, 0, 0, "mods/territorial_worms/files/settings_icon_background.png", 1, 0.5)
-					GuiImage(gui, im_id + 1, -10, 0, setting.icon, 1, 0.5)
-					im_id = im_id + 2
-				end
-				GuiLayoutEnd(gui)
-				if is_visible_string(setting.ui_description) then
-					GuiTooltip(gui, setting.ui_description, "")
-				end
-				mod_setting_group_x_offset = mod_setting_group_x_offset + 2
-				custom_mod_settings_gui(mod_id, setting.settings, gui, in_main_menu)
-				mod_setting_group_x_offset = mod_setting_group_x_offset - 2
-				GuiLayoutAddVerticalSpacing(gui, 4)
+				GuiIdPop(gui)
 			end
-			GuiIdPop(gui)
 		else
 			-- setting
 			local auto_gui = setting.ui_fn == nil
-			local visible = (setting.hidden == nil or not setting.hidden)
-			if auto_gui and visible then
-				local value_type = type(setting.value_default)
-				if setting.not_setting then
-					mod_setting_title(mod_id, gui, in_main_menu, im_id, setting)
-				elseif value_type == "boolean" then
-					mod_setting_bool(mod_id, gui, in_main_menu, im_id, setting)
-				elseif value_type == "number" then
-					mod_setting_number(mod_id, gui, in_main_menu, im_id, setting)
-				elseif value_type == "string" and setting.values ~= nil then
-					mod_setting_enum(mod_id, gui, in_main_menu, im_id, setting)
-				elseif value_type == "string" then
-					mod_setting_text(mod_id, gui, in_main_menu, im_id, setting)
+			local visible = not setting.hidden
+			if visible then
+				if auto_gui then
+					local value_type = type(setting.value_default)
+					if setting.not_setting then
+						mod_setting_title(mod_id, gui, in_main_menu, im_id, setting)
+					elseif value_type == "boolean" then
+						mod_setting_bool(mod_id, gui, in_main_menu, im_id, setting)
+					elseif value_type == "number" then
+						mod_setting_number(mod_id, gui, in_main_menu, im_id, setting)
+					elseif value_type == "string" and setting.values ~= nil then
+						mod_setting_enum(mod_id, gui, in_main_menu, im_id, setting)
+					elseif value_type == "string" then
+						mod_setting_text(mod_id, gui, in_main_menu, im_id, setting)
+					end
+				else
+					setting.ui_fn(mod_id, gui, in_main_menu, im_id, setting)
 				end
-			elseif visible then
-				setting.ui_fn(mod_id, gui, in_main_menu, im_id, setting)
+				if setting.act_as_category then
+					if setting.aac_settings ~= nil then
+						mod_setting_group_x_offset = mod_setting_group_x_offset + 6
+						custom_mod_settings_gui(mod_id, setting.aac_settings, gui, in_main_menu, im_id + 1)
+						mod_setting_group_x_offset = mod_setting_group_x_offset - 6
+						GuiLayoutAddVerticalSpacing(gui, 4)
+					else
+						error(setting.id .. " is missing the field 'settings'")
+					end
+				end
 			end
 		end
 
@@ -722,5 +931,7 @@ local function custom_mod_settings_gui(mod_id, settings, gui, in_main_menu)
 end
 
 function ModSettingsGui(gui, in_main_menu)
+	UpdateWormModeSettingsVisibility(general_worm_settings)
+	UpdateWormOverridesVisibility()
 	custom_mod_settings_gui(modid, mod_settings, gui, in_main_menu)
 end
