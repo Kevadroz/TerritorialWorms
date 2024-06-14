@@ -114,6 +114,15 @@ local function genWormXML(worm)
 			execute_every_n_frame = -1,
 			execute_on_removed = true
 		}))
+
+		if xml_worm.attr.tags then
+			xml_worm.attr.tags = string.gsub(xml_worm.attr.tags, "hittable", "")
+			xml_worm.attr.tags = string.gsub(xml_worm.attr.tags, "homing_target", "")
+			local replacements = 1
+			while replacements > 0 do
+				xml_worm.attr.tags, replacements = string.gsub(xml_worm.attr.tags, ",,", ",")
+			end
+		end
 	end
 
 	if ws_table.pursue then
