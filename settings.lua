@@ -2,8 +2,199 @@
 dofile_once("data/scripts/lib/mod_settings.lua")
 -- dofile_once("data/scripts/lib/utilities.lua")
 
+local debug = DebugGetIsDevBuild()
+
 local modid = "territorial_worms"
 mod_settings_version = 1
+
+local i18n = {}
+i18n["English"] = {
+	precise_button_tooltip_off = "Use a more precise text input box.",
+	precise_button_tooltip_on = "Return to using a slider.",
+	general = "General",
+	factor_active = "Rage per biome tunneled",
+	factor_active_desc = "Amount of rage gained by tunneling.\n" ..
+		 "Measured in biomes tunneled in a straight line in a cardinal direction.",
+	factor_passive = "Rage gained / s",
+	factor_passive_desc = "Amount of rage gained or reduced for each second that passes.",
+	section_count = "Subdivisions per biome",
+	section_count_desc = "Divides biomes in this amount of sections (squared) when checking for visited areas\n" ..
+		 "The higher this value, the better the precision,\n" ..
+		 "but also the worse the performance the more you tunnel.",
+	worm_attraction = "Worm Attraction",
+	worm_attraction_desc = "Configure the worm attraction zone arround the player.",
+	attraction_start_factor = "Minimum Rage",
+	attraction_start_factor_desc = "Amount of rage where you start attracting nearby worms.",
+	attraction_end_factor = "Rage Ceiling",
+	attraction_end_factor_desc = "Amount of rage where the attraction radius is at its maximum.",
+	attraction_start_radius = "Initial Radius",
+	attraction_start_radius_desc = "The radius you attract worms at the minimum rage.",
+	attraction_end_radius = "Final Radius",
+	attraction_end_radius_desc =
+	"The radius you attract worms at the maximum rage.\n(Set to 0 to disable the attraction entirely)",
+	worm_settings = "Worm Settings",
+	worm_settings_desc = "Configure the worms spawned by rage.",
+	ws_pursue = "Pursue Player",
+	ws_pursue_desc = "The worms will relentlesly chase the player.",
+	ws_mode = "Mode",
+	ws_mode_desc =
+	"Normal - Regular worms.\nIllusory - Worms will be unhittable.\nIt is recommended to set the despawn time on illusory mode.",
+	ws_mode_normal = "Normal",
+	ws_mode_illusion = "Illusory",
+	ws_eat_ground = "Destroy Terrain",
+	ws_eat_ground_desc = "The worms break the ground they pass by.",
+	ws_bleed = "Enable Worm Blood",
+	ws_bleed_desc =
+	"If disabled the worms that bleed worm blood won't bleed,\nas a side effect the worms won't leave corpses behind.",
+	ws_loot = "Drop Loot",
+	ws_loot_desc = "The worms drop any loot they usually whould.",
+	ws_despawn_time = "Despawn Time",
+	ws_despawn_time_desc =
+	"How long since until the worms despawn from when they spawned.\n(Set to 0 to disable despawning)",
+	ws_no_gravity = "Enable Flight",
+	ws_no_gravity_desc = "The worms will be able to fly through the air.",
+	spawn_conditions = "Spawn Conditions",
+	spawn_conditions_desc = "Conditions for spawning each type of worm.",
+	sc_vanilla = "Vanilla",
+	sc_new_enemies = "Hornedkey's New Enemies",
+	sc_minimum_rage = "Minimum Rage",
+	sc_minimum_rage_desc1 = "The minimum required rage for a ",
+	sc_minimum_rage_desc2 = " to randomly spawn.",
+	sc_top_rage = "Rage Ceiling",
+	sc_top_rage_desc1 = "The rage at which a ",
+	sc_top_rage_desc2 = " will spawn with it's highest random chance.",
+	sc_initial_chance = "Initial Chance",
+	sc_initial_chance_desc1 = "The probability with which a ",
+	sc_initial_chance_desc2 = " will randomly spawn\nat the minimum rage each second.",
+	sc_max_chance = "Maximum Chance",
+	sc_max_chance_desc1 = "The probability with which a ",
+	sc_max_chance_desc2 = " will randomly spawn\nat the maximum rage each second.\n(Set to 0 to disable this worm)",
+	sc_timeout = "Timeout",
+	sc_timeout_desc1 = "When a ",
+	sc_timeout_desc2 = " spawns, another one\nwon't spawn for this amount of seconds.",
+	sc_max_loaded = "Count Limit",
+	sc_max_loaded_desc1 = "The amount of spawned ",
+	sc_max_loaded_desc2 = " that can be loaded at the same time.\n(Set to 0 to not limit this)",
+	sc_overrides = "Overrides",
+	sc_overrides_desc = "If enabled the next settings will override those in \"Worm settings\".",
+	settings_bottom = "End of Territorial Worms settings",
+	settings_bottom_desc =
+	"If this text didn't exist you wouldn't be able to scroll down\nto the spawn condition settings of the last worm, idk why.",
+}
+i18n["Español"] = {
+	precise_button_tooltip_off = "Usar una caja de entrada de texto más precisa.",
+	precise_button_tooltip_on = "Valver a usar un control deslizante.",
+	general = "General",
+	factor_active = "Furia por bioma atravesado",
+	factor_active_desc = "Cantidad de furia ganada por excavar.\n" ..
+		 "Contada en biomas atravesados en una linea recta en una dirección cardinal.",
+	factor_passive = "Furia ganada por segundo",
+	factor_passive_desc = "Cantidad de furia ganada o perdida por cada segundo que pasa.",
+	section_count = "Subdivisiones por bioma",
+	section_count_desc = "Divide los biomas en esta cantidad de secciones (al cuadrado)\n" ..
+		 "al comprobar que areas han sido visitadas.\n" ..
+		 "Cuanto mayor es el valor mayor es la precisión,\n" ..
+		 "pero tambien empeora mas el rendimiento cuanto mas areas excavas.",
+	worm_attraction = "Atracción de gusanos",
+	worm_attraction_desc = "Configura la zona de atracción de gusanos alrededor del jugador.",
+	attraction_start_factor = "Furia minima",
+	attraction_start_factor_desc = "Cantidad de furia necesaria para empezar a atraer gusanos.",
+	attraction_end_factor = "Tope de furia",
+	attraction_end_factor_desc = "Cantidad de furia en la que el radio de atracción llega a su máximo.",
+	attraction_start_radius = "Radio inicial",
+	attraction_start_radius_desc = "El radio con el que atraes gusanos con furia minima.",
+	attraction_end_radius = "Radio Máximo",
+	attraction_end_radius_desc =
+	"El radio con el que atraes gusanos con la máxima furia.\n(Establezelo a 0 para deshabilitar la atracción de gusanos)",
+	worm_settings = "Opciones de gusanos",
+	worm_settings_desc = "Configura a los gusanos generados por la furia.",
+	ws_pursue = "Perseguir al jugador",
+	ws_pursue_desc = "Los gusanos perseguirán implacablemente al jugador.",
+	ws_mode = "Modo",
+	ws_mode_desc =
+	"Normal - Gusanos normales.\nIlusorio - Los gusanos no seran golpeables.\nSe recomienda establecer el tiempo de desaparición en el modo ilusorio.",
+	ws_mode_normal = "Normal",
+	ws_mode_illusion = "Ilusorio",
+	ws_eat_ground = "Destruir el terreno",
+	ws_eat_ground_desc = "Los gusanos podrán romper el terreno por el que pasen.",
+	ws_bleed = "Habilitar sangre de gusano",
+	ws_bleed_desc =
+	"Si se deshabilita los gusanos que normalmente sangran sangre de gusano\nya no sangrarán nada, como efecto secundario\nlos gusanos ya no dejarán cuerpos detrás.",
+	ws_loot = "Soltar botín",
+	ws_loot_desc = "Los gusanos dejan cualquier botín que dejarian normalmente.",
+	ws_despawn_time = "Tiempo de desaparición",
+	ws_despawn_time_desc =
+	"Cuanto tardan los gusanos en desaparecer desde su generación inicial.\n(Establecelo a 0 para deshabilitar la desaparición)",
+	ws_no_gravity = "Habilitar vuelo",
+	ws_no_gravity_desc = "Los gusanos podrán volar por el aire.",
+	spawn_conditions = "Condiciones de generación",
+	spawn_conditions_desc = "Condiciones para generar cada tipo de gusano.",
+	sc_vanilla = "Juego base",
+	sc_new_enemies = "New Enemies de Hornedkey",
+	sc_minimum_rage = "Furia minima",
+	sc_minimum_rage_desc1 = "La cantidad de furia minima necesaria para que\nun ",
+	sc_minimum_rage_desc2 = " se genere aleatoriamente.",
+	sc_top_rage = "Tope de furia",
+	sc_top_rage_desc1 = "La furia con la que un ",
+	sc_top_rage_desc2 = " se generará\ncon su probabilidad aleatoria más alta.",
+	sc_initial_chance = "Probabilidad inicial",
+	sc_initial_chance_desc1 = "La probabilidad con la que un ",
+	sc_initial_chance_desc2 = " aparecera aleatoriamente\ncon la furia minima necesaria cada segundo.",
+	sc_max_chance = "Probabilidad máxima",
+	sc_max_chance_desc1 = "La probabilidad con la que un ",
+	sc_max_chance_desc2 =
+	" aparecera aleatoriamente\ncon la furia máxima cada segundo.\n(Establezelo a 0 para deshabilitar este gusano)",
+	sc_timeout = "Tiempo de espera",
+	sc_timeout_desc1 = "Cuando un ",
+	sc_timeout_desc2 = " aparece,\nno aparecerá otro durante este tiempo.",
+	sc_max_loaded = "Cantidad límite",
+	sc_max_loaded_desc1 = "La cantidad de ",
+	sc_max_loaded_desc2 = " generados que pueden estar cargados al mismo tiempo.\n(Establezelo a 0 para no limitar esto)",
+	sc_overrides = "Reemplazos",
+	sc_overrides_desc = "Si se habilita las siguientes opciones reemplazarán las de \"Opciones de gusanos\".",
+	settings_bottom = "Fin de las opciones de Territorial Worms",
+	settings_bottom_desc =
+	"Si este texto no existiera no podrias desplazarte\nhasta las condiciones de generación del ultimo gusano,\nno sé por qué.",
+}
+local language = GameTextGetTranslatedOrNot("$current_language")
+local function GetI18N(orig_string)
+	return string.gsub(orig_string, "m%$[%a%d_]+%$?", function(key)
+		local parse_end = -1
+		if string.sub(key, -1, -1) == "$" then
+			parse_end = -2
+		end
+		local parsed_key = string.sub(key, 3, parse_end)
+		local return_val = i18n[language][parsed_key] or i18n["English"][parsed_key] or key
+		--print("'" .. parsed_key .. "'='" .. return_val .. "'")
+		return return_val
+	end)
+end
+local function TranslateModSettings(table)
+	if table.settings then
+		for _, setting in ipairs(table.settings) do
+			TranslateModSettings(setting)
+		end
+	end
+	if table.values ~= nil then
+		for _, value in ipairs(table.values) do
+			value[2] = GetI18N(value[2])
+		end
+	end
+	if table.ui_description ~= nil then
+		table.ui_description = GetI18N(table.ui_description)
+	end
+	if table.ui_name ~= nil then
+		table.ui_name = GetI18N(table.ui_name)
+	else
+		for _, setting in ipairs(table) do
+			TranslateModSettings(setting)
+		end
+	end
+end
+if i18n[language] == nil and debug then
+	print("[Territorial Worms] Untranslated language '" .. language .. "'")
+	language = "English"
+end
 
 ---@param number number?
 ---@return string
@@ -247,10 +438,10 @@ local function mod_setting_number_with_field(mod_id, gui, in_main_menu, im_id, s
 	local precise_button_sprite, precise_button_tooltip
 	if using_precise then
 		precise_button_sprite = "mods/" .. mod_id .. "/files/use_inprecise_settings.png"
-		precise_button_tooltip = "Return to using a slider."
+		precise_button_tooltip = GetI18N("m$precise_button_tooltip_on")
 	else
 		precise_button_sprite = "mods/" .. mod_id .. "/files/use_precise_settings.png"
-		precise_button_tooltip = "Use a more precise text input box."
+		precise_button_tooltip = GetI18N("m$precise_button_tooltip_off")
 	end
 
 	if FadeTimes[setting.id] <= 0 and not using_precise then
@@ -347,72 +538,73 @@ local function GenWormSettings(prefix, defaults)
 		defaults.loot = false
 	end
 	if defaults.despawn_time == nil then
-		defaults.despawn_time = 30
+		if defaults.mode == "illusion" then
+			defaults.despawn_time = 30
+		else
+			defaults.despawn_time = 0
+		end
 	end
 	if defaults.no_gravity == nil then
-		defaults.no_gravity = false
+		defaults.no_gravity = defaults.mode == "illusion"
 	end
 	return {
 		{
 			id = prefix .. "pursue",
-			ui_name = "Pursue Player",
-			ui_description = "The worms will relentlesly chase the player.",
+			ui_name = "m$ws_pursue",
+			ui_description = "m$ws_pursue_desc",
 			value_default = defaults.pursue,
 			scope = MOD_SETTING_SCOPE_RUNTIME_RESTART
 		},
 		{
+			id = prefix .. "despawn_time",
+			ui_name = "m$ws_despawn_time",
+			ui_description = "m$ws_despawn_time_desc",
+			value_default = defaults.despawn_time,
+			value_min = 0,
+			value_max = 20000,
+			slider_max = 300,
+			slider_displayed_decimals = 2,
+			slider_width = 96,
+			decimal_limit = 3,
+			value_display_formatting = " $0s",
+			scope = MOD_SETTING_SCOPE_RUNTIME_RESTART,
+			ui_fn = mod_setting_number_with_field
+		},
+		{
+			id = prefix .. "no_gravity",
+			ui_name = "m$ws_no_gravity",
+			ui_description = "m$ws_no_gravity_desc",
+			value_default = defaults.no_gravity,
+			scope = MOD_SETTING_SCOPE_RUNTIME_RESTART
+		},
+		{
 			id = prefix .. "mode",
-			ui_name = "Mode",
-			ui_description =
-			"Normal - Regular worms.\nIllusory - Worms will be unhittable and will despawn after a while.",
+			ui_name = "m$ws_mode",
+			ui_description = "m$ws_mode_desc",
 			value_default = defaults.mode,
-			values = { { "normal", "Normal" }, { "illusion", "Illusory" } },
+			values = { { "normal", "m$ws_mode_normal" }, { "illusion", "m$ws_mode_illusion" } },
 			scope = MOD_SETTING_SCOPE_RUNTIME_RESTART,
 			act_as_category = true,
 			settings = {
 				{
 					id = prefix .. "eat_ground",
-					ui_name = "Destroy Terrain",
-					ui_description = "The worms break the ground they pass by.",
+					ui_name = "m$ws_eat_ground",
+					ui_description = "m$ws_eat_ground_desc",
 					value_default = defaults.eat_ground,
 					scope = MOD_SETTING_SCOPE_RUNTIME_RESTART
 				},
 				{
 					id = prefix .. "bleed",
-					ui_name = "Enable Worm Blood",
-					ui_description =
-					"If disabled the worms that bleed worm blood won't bleed,\nas a side effect the worms won't leave corpses behind.",
+					ui_name = "m$ws_bleed",
+					ui_description = "m$ws_bleed_desc",
 					value_default = defaults.bleed,
 					scope = MOD_SETTING_SCOPE_RUNTIME_RESTART
 				},
 				{
 					id = prefix .. "loot",
-					ui_name = "Drop Loot",
-					ui_description = "The worms drop any loot they usually whould.",
+					ui_name = "m$ws_loot",
+					ui_description = "m$ws_loot_desc",
 					value_default = defaults.loot,
-					scope = MOD_SETTING_SCOPE_RUNTIME_RESTART
-				},
-				{
-					id = prefix .. "despawn_time",
-					ui_name = "Despawn Time",
-					ui_description =
-					"How long since until the worms despawn from when they spawned.\n(Set to 0 to disable despawning)",
-					value_default = defaults.despawn_time,
-					value_min = 0,
-					value_max = 20000,
-					slider_max = 300,
-					slider_displayed_decimals = 2,
-					slider_width = 96,
-					decimal_limit = 3,
-					value_display_formatting = " $0s",
-					scope = MOD_SETTING_SCOPE_RUNTIME_RESTART,
-					ui_fn = mod_setting_number_with_field
-				},
-				{
-					id = prefix .. "no_gravity",
-					ui_name = "Enable Flight",
-					ui_description = "The worms will be able to fly through the air.",
-					value_default = defaults.no_gravity,
 					scope = MOD_SETTING_SCOPE_RUNTIME_RESTART
 				},
 			}
@@ -421,19 +613,19 @@ local function GenWormSettings(prefix, defaults)
 end
 local general_worm_settings = GenWormSettings("spawned")
 
-local sc_settings = {}
+local sc_vanilla = {}
+-- local sc_apotheosis = {}
+-- local sc_new_enemies = {}
 ---@diagnostic disable-next-line: lowercase-global
 mod_settings = {
 	{
 		category_id = "general",
-		ui_name = "General",
+		ui_name = "m$general",
 		settings = {
 			{
 				id = "factor_active",
-				ui_name = "Rage per biome tunneled",
-				ui_description =
-					 "Amount of rage gained by tunneling.\n" ..
-					 "Measured in biomes tunneled in a straight line in a cardinal direction.",
+				ui_name = "m$factor_active",
+				ui_description = "m$factor_active_desc",
 				value_default = 1,
 				value_min = 0,
 				value_max = 10000,
@@ -445,8 +637,8 @@ mod_settings = {
 			},
 			{
 				id = "factor_passive",
-				ui_name = "Rage gained / s",
-				ui_description = "Amount of rage gained or reduced for each second that passes.",
+				ui_name = "m$factor_passive",
+				ui_description = "m$factor_passive_desc",
 				value_default = -0.0005,
 				value_min = -10000,
 				value_max = 10000,
@@ -459,11 +651,8 @@ mod_settings = {
 			},
 			{
 				id = "section_count",
-				ui_name = "Subdivisions per biome",
-				ui_description =
-					 "Divides 'visited' biome areas in this amount of sections (squared)\n" ..
-					 "The higher this value, the better the precision,\n" ..
-					 "but also the worse the performance the more you tunnel.",
+				ui_name = "m$section_count",
+				ui_description = "m$section_count_desc",
 				value_default = 16,
 				value_min = 3,
 				value_max = 32,
@@ -474,13 +663,13 @@ mod_settings = {
 	},
 	{
 		category_id = "worm_attraction",
-		ui_name = "Worm Attraction",
-		ui_description = "Configure the worm attraction zone arround the player.",
+		ui_name = "m$worm_attraction",
+		ui_description = "m$worm_attraction_desc",
 		settings = {
 			{
 				id = "attraction_start_factor",
-				ui_name = "Minimum Rage",
-				ui_description = "Amount of rage where you start attracting nearby worms.",
+				ui_name = "m$attraction_start_factor",
+				ui_description = "m$attraction_start_factor_desc",
 				value_default = 3,
 				value_min = 0,
 				value_max = 10000,
@@ -494,8 +683,8 @@ mod_settings = {
 			},
 			{
 				id = "attraction_end_factor",
-				ui_name = "Rage Ceiling",
-				ui_description = "Amount of rage where the attraction radius is at its maximum.",
+				ui_name = "m$attraction_end_factor",
+				ui_description = "m$attraction_end_factor_desc",
 				value_default = 17.5,
 				value_min = 0,
 				value_max = 10000,
@@ -509,8 +698,8 @@ mod_settings = {
 			},
 			{
 				id = "attraction_start_radius",
-				ui_name = "Initial Radius",
-				ui_description = "The radius you attract worms at the minimum rage.",
+				ui_name = "m$attraction_start_radius",
+				ui_description = "m$attraction_start_radius_desc",
 				value_default = 0,
 				value_min = 0,
 				value_max = 10000,
@@ -523,9 +712,8 @@ mod_settings = {
 			},
 			{
 				id = "attraction_end_radius",
-				ui_name = "Final Radius",
-				ui_description =
-				"The radius you attract worms at the maximum rage.\n(Set to 0 to disable the attraction entirely)",
+				ui_name = "m$attraction_end_radius",
+				ui_description = "m$attraction_end_radius_desc",
 				value_default = 1000,
 				value_min = 0,
 				value_max = 10000,
@@ -541,21 +729,40 @@ mod_settings = {
 	},
 	{
 		category_id = "worm_settings",
-		ui_name = "Worm Settings",
-		ui_description = "Configure the worms spawned by rage.",
+		ui_name = "m$worm_settings",
+		ui_description = "m$worm_settings_desc",
 		settings = general_worm_settings
 	},
 	{
 		category_id = "spawn_conditions",
-		ui_name = "Spawn Conditions",
-		ui_description = "Conditions for spawning each type of worm.",
-		settings = sc_settings
+		ui_name = "m$spawn_conditions",
+		ui_description = "m$spawn_conditions_desc",
+		settings = {
+			{
+				category_id = "sc_vanilla",
+				ui_name = "m$sc_vanilla",
+				settings = sc_vanilla
+			},
+			-- {
+			-- 	category_id = "sc_apotheosis",
+			-- 	ui_name = "Apotheosis",
+			-- 	settings = sc_apotheosis,
+			-- 	foldable = true,
+			-- 	_folded = true
+			-- },
+			-- {
+			-- 	category_id = "sc_new_enemies",
+			-- 	ui_name = "m$sc_new_enemies",
+			-- 	settings = sc_new_enemies,
+			-- 	foldable = true,
+			-- 	_folded = true
+			-- },
+		}
 	},
 	{
 		category_id = "settings_bottom",
-		ui_name = "End of Territorial Worms settings",
-		ui_description =
-		"If this text didn't exist you wouldn't be able to scroll down\nto the spawn condition settings of the last worm, idk why.",
+		ui_name = "m$settings_bottom",
+		ui_description = "m$settings_bottom_desc",
 		settings = {}
 	}
 }
@@ -563,9 +770,7 @@ mod_settings = {
 local wms_visibility_modes = {
 	eat_ground = { "normal" },
 	bleed = { "normal" },
-	loot = { "normal" },
-	despawn_time = { "illusion" },
-	no_gravity = { "normal" }
+	loot = { "normal" }
 }
 
 for _, conditions in pairs(wms_visibility_modes) do
@@ -593,7 +798,7 @@ local function UpdateWormModeSettingsVisibility(worm_settings)
 	end
 end
 local function UpdateWormOverridesVisibility()
-	for _, worm in ipairs(sc_settings) do
+	for _, worm in ipairs(sc_vanilla) do
 		if worm.settings then
 			for _, setting in ipairs(worm.settings) do
 				if setting.id and string.sub(setting.id, -18, -1) == "_overrides_enabled" then
@@ -610,18 +815,25 @@ local function UpdateWormOverridesVisibility()
 	end
 end
 
+---@param sc_table table
 ---@param id string
 ---@param display_name string
----@param minimum_rage integer
----@param top_rage integer
----@param initial_chance integer
----@param top_chance integer
-local function GenSCSettings(id, display_name, minimum_rage, top_rage, initial_chance, top_chance, timeout, max_loaded, icon,
+---@param minimum_rage number
+---@param top_rage number
+---@param initial_chance number
+---@param top_chance number
+---@param timeout integer
+---@param max_loaded integer
+---@param icon string?
+---@param override_defaults table?
+local function GenSCSettings(sc_table, id, display_name, minimum_rage, top_rage, initial_chance, top_chance, timeout,
+									  max_loaded,
+									  icon,
 									  override_defaults)
 	display_name = GameTextGetTranslatedOrNot(display_name)
 	local overrides_prefix = "sc_" .. id .. "_overrides"
-	table.insert(sc_settings, {
-		category_id = id,
+	table.insert(sc_table, {
+		category_id = "sc_worm_" .. id,
 		ui_name = display_name,
 		foldable = true,
 		_folded = true,
@@ -629,8 +841,8 @@ local function GenSCSettings(id, display_name, minimum_rage, top_rage, initial_c
 		settings = {
 			{
 				id = "sc_" .. id .. "_minimum_rage",
-				ui_name = "Minimum Rage",
-				ui_description = "The minimum required rage for a " .. display_name .. " to randomly spawn.",
+				ui_name = "m$sc_minimum_rage",
+				ui_description = "m$sc_minimum_rage_desc1$" .. display_name .. "m$sc_minimum_rage_desc2",
 				value_default = minimum_rage,
 				value_min = 0,
 				value_max = 10000,
@@ -644,8 +856,8 @@ local function GenSCSettings(id, display_name, minimum_rage, top_rage, initial_c
 			},
 			{
 				id = "sc_" .. id .. "_top_rage",
-				ui_name = "Rage Ceiling",
-				ui_description = "The rage at which a " .. display_name .. " will spawn with it's highest random chance.",
+				ui_name = "m$sc_top_rage",
+				ui_description = "m$sc_top_rage_desc1$" .. display_name .. "m$sc_top_rage_desc2",
 				value_default = top_rage,
 				value_min = 0,
 				value_max = 10000,
@@ -659,9 +871,8 @@ local function GenSCSettings(id, display_name, minimum_rage, top_rage, initial_c
 			},
 			{
 				id = "sc_" .. id .. "_initial_chance",
-				ui_name = "Initial Chance",
-				ui_description = "The probability with which a " ..
-					 display_name .. " will randomly spawn\nat the minimum rage each second.",
+				ui_name = "m$sc_initial_chance",
+				ui_description = "m$sc_initial_chance_desc1$" .. display_name .. "m$sc_initial_chance_desc2",
 				value_default = initial_chance,
 				value_min = 0,
 				value_max = 100,
@@ -676,9 +887,8 @@ local function GenSCSettings(id, display_name, minimum_rage, top_rage, initial_c
 			},
 			{
 				id = "sc_" .. id .. "_max_chance",
-				ui_name = "Maximum Chance",
-				ui_description = "The probability with which a " ..
-					 display_name .. " will randomly spawn\nat the maximum rage each second.\n(Set to 0 to disable this worm)",
+				ui_name = "m$sc_max_chance",
+				ui_description = "m$sc_max_chance_desc1$" .. display_name .. "m$sc_minimum_rage_desc2",
 				value_default = top_chance,
 				value_min = 0,
 				value_max = 100,
@@ -693,10 +903,10 @@ local function GenSCSettings(id, display_name, minimum_rage, top_rage, initial_c
 			},
 			{
 				id = "sc_" .. id .. "_timeout",
-				ui_name = "Timeout",
-				ui_description = "When a " .. display_name .. " spawns, another one\nwon't spawn for this amount of seconds.",
+				ui_name = "m$sc_timeout",
+				ui_description = "m$sc_timeout_desc1$" .. display_name .. "m$sc_timeout_desc2",
 				value_default = timeout,
-				value_min = 0,
+				value_min = 1,
 				value_max = 5000,
 				slider_max = math.max(60, timeout),
 				decimal_limit = 0,
@@ -706,8 +916,8 @@ local function GenSCSettings(id, display_name, minimum_rage, top_rage, initial_c
 			},
 			{
 				id = "sc_" .. id .. "_max_loaded",
-				ui_name = "Count Limit",
-				ui_description = "The amount of spawned " .. display_name .. " that can be loaded at the same time.\n(Set to 0 to not limit this)",
+				ui_name = "m$sc_max_loaded",
+				ui_description = "m$sc_max_loaded_desc1$" .. display_name .. "m$sc_max_loaded_desc2",
 				value_default = max_loaded,
 				value_min = 0,
 				value_max = 1000,
@@ -718,8 +928,8 @@ local function GenSCSettings(id, display_name, minimum_rage, top_rage, initial_c
 			},
 			{
 				id = overrides_prefix .. "_enabled",
-				ui_name = "Overrides",
-				ui_description = "If enabled the next settings will override those in \"Worm settings\".",
+				ui_name = "m$sc_overrides",
+				ui_description = "m$sc_overrides_desc",
 				value_default = override_defaults ~= nil,
 				act_as_category = true,
 				scope = MOD_SETTING_SCOPE_RUNTIME_RESTART,
@@ -739,20 +949,20 @@ else
 	limatoukka_name = "$animal_maggot_tiny"
 end
 
-GenSCSettings("pikkumato", "$animal_worm_tiny", 1, 25, 0, 25, 0.5, 20, "data/ui_gfx/animal_icons/worm_tiny.png")
-GenSCSettings("mato", "$animal_worm", 3, 20, 0, 5, 2, 15, "data/ui_gfx/animal_icons/worm.png")
-GenSCSettings("jattimato", "$animal_worm_big", 5, 15, 0, 2.5, 5, 10, "data/ui_gfx/animal_icons/worm_big.png")
-GenSCSettings("kalmamato", "$animal_worm_skull", 10, 20, 0, 1.2, 10, 7, "data/ui_gfx/animal_icons/worm_skull.png")
-GenSCSettings("helvetinmato", "$animal_worm_end", 20, 35, 0, 0.5, 25, 5, "data/ui_gfx/animal_icons/worm_end.png")
-table.insert(sc_settings, {
-	category_id = "sc_non_implemented",
-	ui_name = "v Not Implemented yet v",
-	settings = {}
-})
-GenSCSettings("suomuhauki", "$animal_boss_dragon", 50, 80, 0, 0, 60, 3, "data/ui_gfx/animal_icons/boss_dragon.png")
-GenSCSettings("limatoukka", limatoukka_name, 85, 135, 0, 0, 180, 2, "data/ui_gfx/animal_icons/maggot_tiny.png", {
-	mode = "illusion"
-})
+GenSCSettings(sc_vanilla, "pikkumato", "$animal_worm_tiny", 1, 25, 0, 25, 0.5, 20,
+	"data/ui_gfx/animal_icons/worm_tiny.png")
+GenSCSettings(sc_vanilla, "mato", "$animal_worm", 3, 20, 0, 5, 2, 15, "data/ui_gfx/animal_icons/worm.png")
+GenSCSettings(sc_vanilla, "jattimato", "$animal_worm_big", 5, 15, 0, 2.5, 5, 10, "data/ui_gfx/animal_icons/worm_big.png")
+GenSCSettings(sc_vanilla, "kalmamato", "$animal_worm_skull", 10, 20, 0, 1.2, 10, 7,
+	"data/ui_gfx/animal_icons/worm_skull.png")
+GenSCSettings(sc_vanilla, "helvetinmato", "$animal_worm_end", 20, 35, 0, 0.5, 25, 5,
+	"data/ui_gfx/animal_icons/worm_end.png")
+GenSCSettings(sc_vanilla, "suomuhauki", "$animal_boss_dragon", 50, 80, 0, 0, 60, 3,
+	"data/ui_gfx/animal_icons/boss_dragon.png")
+GenSCSettings(sc_vanilla, "limatoukka", limatoukka_name, 85, 135, 0, 0, 180, 2,
+	"data/ui_gfx/animal_icons/maggot_tiny.png", {
+		mode = "illusion"
+	})
 
 local function SplitSettingsWithChilds(settings)
 	local to_insert = {}
@@ -819,8 +1029,9 @@ function custom_mod_setting_category_button(_, gui, im_id, im_id2, im_id3, im_id
 	GuiIdPush(gui, 892304589)
 	if category.icon then
 		GuiZSetForNextWidget(gui, 2)
-		GuiImage(gui, im_id4, 0, 0, "mods/territorial_worms/files/settings_icon_background.png", 1, 0.5)
-		GuiImage(gui, im_id3, -10, 0, category.icon, 1, 0.5)
+		local group_offset = mod_setting_group_x_offset
+		GuiImage(gui, im_id4, group_offset, 1, "mods/territorial_worms/files/settings_icon_background.png", 1, 0.5)
+		GuiImage(gui, im_id3, group_offset - 14, 1, category.icon, 1, 0.5)
 	end
 
 	GuiOptionsAddForNextWidget(gui, GUI_OPTION.DrawSemiTransparent)
@@ -852,7 +1063,7 @@ local function custom_mod_settings_gui(mod_id, settings, gui, in_main_menu, im_i
 
 	for _, setting in ipairs(settings) do
 		if setting.category_id ~= nil then
-			if setting.hidden ~= false and setting.ui_name ~= "dummy" then
+			if (not setting.hidden) and setting.ui_name ~= "dummy" then
 				GuiIdPush(gui, im_id)
 				if setting.foldable then
 					local im_id3 = im_id
@@ -877,8 +1088,9 @@ local function custom_mod_settings_gui(mod_id, settings, gui, in_main_menu, im_i
 					GuiOptionsAddForNextWidget(gui, GUI_OPTION.DrawSemiTransparent)
 					GuiText(gui, mod_setting_group_x_offset, 0, setting.ui_name)
 					if setting.icon then
-						GuiImage(gui, im_id, 0, 0, "mods/territorial_worms/files/settings_icon_background.png", 1, 0.5)
-						GuiImage(gui, im_id + 1, -10, 0, setting.icon, 1, 0.5)
+						GuiImage(gui, im_id, mod_setting_group_x_offset, 0,
+							"mods/territorial_worms/files/settings_icon_background.png", 1, 0.5)
+						GuiImage(gui, im_id + 1, mod_setting_group_x_offset - 10, 0, setting.icon, 1, 0.5)
 						im_id = im_id + 2
 					end
 					GuiLayoutEnd(gui)
@@ -929,6 +1141,8 @@ local function custom_mod_settings_gui(mod_id, settings, gui, in_main_menu, im_i
 		im_id = im_id + 1
 	end
 end
+
+TranslateModSettings(mod_settings)
 
 function ModSettingsGui(gui, in_main_menu)
 	UpdateWormModeSettingsVisibility(general_worm_settings)
